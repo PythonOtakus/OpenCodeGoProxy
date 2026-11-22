@@ -2,12 +2,15 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "rewrites": [
-    { "source": "/v1/:path*", "destination": "/api/v1/:path*" },
+    { "source": "/v1/chat/completions", "destination": "/api/v1/chat/completions" },
+    { "source": "/v1/responses", "destination": "/api/v1/responses" },
+    { "source": "/v1/messages", "destination": "/api/v1/messages" },
+    { "source": "/v1/models", "destination": "/api/v1/models" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/__health", "destination": "/api/health" }
   ],
   "functions": {
-    "api/[...path].ts": {
+    "api/**/*.ts": {
       "maxDuration": 60
     }
   }

@@ -40,6 +40,27 @@ async function main(): Promise<void> {
   const apiHealth = await handleProxy({ method: 'GET', url: '/api/health', headers: {} });
   record('/api/health 也能响应', apiHealth.status === 200);
 
+  // 4. 显式路由文件能被加载（替代 catch-all 后的结构）
+  const routeModules = [
+    '../api/health',
+    '../api/v1/models',
+    '../api/v1/chat/completions',
+    '../api/v1/responses',
+    '../api/v1/messages',
+  ];
+  let routesOk = 0;
+  for (const mod of routeModules) {
+    try {
+      const loaded = require(mod) as { default?: unknown };
+      if (typeof loaded.default === 'function') {
+        routesOk += 1;
+      }
+    } catch {
+      /* 下面统一断言 */
+    }
+  }
+  record('5 个显式路由文件可加载', routesOk === routeModules.length, `${routesOk}/${routeModules.length}`);
+
   // 4. 真实上游：模型列表
   const models = await handleProxy({ method: 'GET', url: '/v1/models', headers: {} });
   let modelCount = 0;
