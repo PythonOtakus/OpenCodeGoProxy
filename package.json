@@ -11,8 +11,8 @@
     "dev": "tsx scripts/dev-server.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.build.json",
-    "verify": "npm run build && node dist/scripts/verify.js"
+    "build:dist": "tsc -p tsconfig.build.json",
+    "verify": "npm run build:dist && node dist/scripts/verify.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

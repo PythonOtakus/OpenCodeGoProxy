@@ -107,12 +107,22 @@ npm run verify     # 编译到 dist/ 并对**编译产物**跑 8 项验证
 
 `npm run verify` 这条别跳过：本地用 tsx 跑源码能通，不等于 Vercel 构建后能通。`verify` 编译成 CommonJS 再验证，形态与线上一致。
 
+> 注意脚本名是 `build:dist` 而不是 `build`。Vercel 一旦发现有 `build` 脚本，
+> 就会把项目当成静态站点构建，然后因为找不到 `public/` 目录而失败
+> （`STATIC_BUILD_NO_OUT_DIR`）。`vercel.json` 里也显式写了 `"framework": null`。
+
 ## 踩过的坑
 
-**`type: "module"` + `.ts` 扩展名导入在 Vercel 上会崩。**
-首次部署返回 `500 FUNCTION_INVOCATION_FAILED`。原因是用 `"type": "module"` 又在 import 里写了 `.ts` 后缀——本地 `--experimental-strip-types` 能跑，但 Vercel 的构建器走完全不同的打包路径，直接失败。
+**1. `type: "module"` + `.ts` 扩展名导入在 Vercel 上会崩。**
+首次部署 `500 FUNCTION_INVOCATION_FAILED`。本地 `--experimental-strip-types` 能跑，Vercel 构建器走不同打包路径，加载阶段就失败。
+现在：CommonJS + 导入不写扩展名 + `tsx` 跑开发/测试。
 
-现在的写法：CommonJS + 导入不写扩展名 + `tsx` 跑开发/测试。改完后 `npm run verify` 8 项全通过，覆盖真实上游与密钥透传。
+**2. 有 `build` 脚本会让 Vercel 误判为静态站点。**
+第二次部署报 `STATIC_BUILD_NO_OUT_DIR: No Output Directory named "public"`——即使项目里只有 serverless functions，Vercel 也会尝试静态构建。
+现在：脚本改名 `build:dist`，并在 `vercel.json` 设 `"framework": null` 彻底关掉框架检测。
+
+**3. Hobby 套餐函数超时上限是 60 秒。**
+`maxDuration: 300` 会直接报配置错误，已改为 60。
 
 ## 项目结构
 
