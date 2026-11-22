@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { deriveSessionId, makeSessionId } from '../lib/session.ts';
+import { deriveSessionId, makeSessionId } from '../lib/session';
 
 describe('deriveSessionId', () => {
   const firstTurn = JSON.stringify({

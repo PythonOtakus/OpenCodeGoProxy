@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import type { AddressInfo } from 'node:net';
-import { handleProxy } from '../lib/proxy.ts';
+import { handleProxy } from '../lib/proxy';
 
 /** 冒充上游，把收到的请求头/体记录下来供断言。 */
 interface Captured {

@@ -54,6 +54,8 @@ npx vercel --prod
 
 部署完你会拿到 `https://<project>.vercel.app`。
 
+也可以在 Vercel 控制台直接 **Import Git Repository** 连这个仓库，每次 push 自动重新部署。
+
 ### 验证
 
 ```bash
@@ -94,12 +96,23 @@ Base URL 是**固定值**，部署一次就永远不变，不会像 Cloudflare Q
 ## 本地开发
 
 ```bash
-npm run dev      # http://127.0.0.1:3000
-npm test         # 28 项，含真实上游穿透
+npm install
+npm run dev        # http://127.0.0.1:3000
+npm test           # 28 项，含真实上游穿透
 npm run typecheck
+npm run verify     # 编译到 dist/ 并对**编译产物**跑 8 项验证
 ```
 
-`npm run dev` 起的是纯 Node 服务器，行为和 Vercel 上一致，可以先用它验证再部署。
+`npm run dev` 起的是纯 Node 服务器，行为和 Vercel 上一致。
+
+`npm run verify` 这条别跳过：本地用 tsx 跑源码能通，不等于 Vercel 构建后能通。`verify` 编译成 CommonJS 再验证，形态与线上一致。
+
+## 踩过的坑
+
+**`type: "module"` + `.ts` 扩展名导入在 Vercel 上会崩。**
+首次部署返回 `500 FUNCTION_INVOCATION_FAILED`。原因是用 `"type": "module"` 又在 import 里写了 `.ts` 后缀——本地 `--experimental-strip-types` 能跑，但 Vercel 的构建器走完全不同的打包路径，直接失败。
+
+现在的写法：CommonJS + 导入不写扩展名 + `tsx` 跑开发/测试。改完后 `npm run verify` 8 项全通过，覆盖真实上游与密钥透传。
 
 ## 项目结构
 

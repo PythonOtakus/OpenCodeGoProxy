@@ -8,13 +8,8 @@
   ],
   "functions": {
     "api/[...path].ts": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "memory": 1024
     }
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [{ "key": "X-Powered-By", "value": "OpenCodeGoProxy" }]
-    }
-  ]
+  }
 }

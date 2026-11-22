@@ -1,5 +1,5 @@
-import { deriveSessionId, type SessionMode } from './session.ts';
-import { rewritePath } from './path.ts';
+import { deriveSessionId, type SessionMode } from './session';
+import { rewritePath } from './path';
 
 /** 上游计费端点。 */
 export const UPSTREAM_GO = 'https://opencode.ai/inference/go';

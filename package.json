@@ -4,18 +4,20 @@
   "private": true,
   "description": "在 Vercel 上中转 OpenCode Go，供 Cursor 等受 SSRF 限制的客户端使用",
   "license": "MIT",
-  "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "node --experimental-strip-types scripts/dev-server.ts",
-    "test": "node --experimental-strip-types --test test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "dev": "tsx scripts/dev-server.ts",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "verify": "npm run build && node dist/scripts/verify.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@vercel/node": "^5.0.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

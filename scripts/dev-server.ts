@@ -6,8 +6,7 @@
  *   curl http://127.0.0.1:3000/v1/models
  */
 import http from 'node:http';
-import { handleProxy } from '../lib/proxy.ts';
-
+import { handleProxy } from '../lib/proxy';
 const PORT = Number(process.env.PORT ?? 3000);
 
 const server = http.createServer((req, res) => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { rewritePath } from '../lib/path.ts';
+import { rewritePath } from '../lib/path';
 
 describe('rewritePath', () => {
   it('裸 /v1 路径补上 openai 前缀', () => {
