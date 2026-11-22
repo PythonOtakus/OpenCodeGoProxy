@@ -142,12 +142,35 @@ describe('handleProxy 透传行为', () => {
     assert.equal(captured[0].acceptEncoding, 'identity');
   });
 
-  it('请求体原样转发，不做改写', async () => {
+  it('未指定推理强度时默认注入 reasoning_effort=max', async () => {
+    captured.length = 0;
+    await handleProxy(
+      {
+        method: 'POST',
+        url: '/v1/chat/completions',
+        headers: {},
+        body: JSON.stringify({
+          model: 'glm-5.3',
+          messages: [{ role: 'user', content: '你好' }],
+          stream: true,
+        }),
+      },
+      { upstream: origin },
+    );
+    const forwarded = JSON.parse(captured[0].body) as {
+      reasoning_effort?: string;
+      stream?: boolean;
+    };
+    assert.equal(forwarded.reasoning_effort, 'max');
+    assert.equal(forwarded.stream, true);
+  });
+
+  it('客户端已指定推理强度时不覆盖', async () => {
     captured.length = 0;
     const payload = JSON.stringify({
       model: 'glm-5.3',
       messages: [{ role: 'user', content: '你好' }],
-      stream: true,
+      reasoning_effort: 'low',
     });
     await handleProxy(
       { method: 'POST', url: '/v1/chat/completions', headers: {}, body: payload },
@@ -155,15 +178,37 @@ describe('handleProxy 透传行为', () => {
     );
     assert.equal(captured[0].body, payload);
   });
+
+  it('Responses 路径注入 reasoning.effort=max', async () => {
+    captured.length = 0;
+    await handleProxy(
+      {
+        method: 'POST',
+        url: '/v1/responses',
+        headers: {},
+        body: JSON.stringify({ model: 'gpt-6-luna', input: 'hi' }),
+      },
+      { upstream: origin },
+    );
+    const forwarded = JSON.parse(captured[0].body) as {
+      reasoning?: { effort?: string };
+    };
+    assert.equal(forwarded.reasoning?.effort, 'max');
+  });
 });
 
 describe('handleProxy 健康检查', () => {
   it('/health 不走上游', async () => {
     const result = await handleProxy({ method: 'GET', url: '/health', headers: {} });
     assert.equal(result.status, 200);
-    const payload = JSON.parse(result.body) as { healthy: boolean; keyMode: string };
+    const payload = JSON.parse(result.body) as {
+      healthy: boolean;
+      keyMode: string;
+      defaultReasoningEffort: string | false;
+    };
     assert.equal(payload.healthy, true);
     assert.equal(payload.keyMode, 'passthrough', '必须显式声明不持有密钥');
+    assert.equal(payload.defaultReasoningEffort, 'max');
   });
 
   it('/api/__health 同样响应', async () => {

@@ -18,7 +18,7 @@ Access to private networks is forbidden
 **2. OpenCode Go 强制要求 session 头。**
 Go 网关要求每个请求带 `x-opencode-session: ses_...`，缺了直接 `400 MissingSessionID`。而 Cursor 没有加自定义请求头的入口。
 
-这个中转就做两件事：补 session 头、归一化路径。**仅此而已。**
+这个中转做三件事：补 session 头、归一化路径、缺省时把推理强度设为 `max`。
 
 ## 设计：服务器不持有任何密钥
 
@@ -26,8 +26,9 @@ Go 网关要求每个请求带 `x-opencode-session: ses_...`，缺了直接 `400
 
 ```
 Cursor  ──[Authorization: Bearer oc_sk_你的真实key]──▶  Vercel 中转
-                                                         │ 只补 x-opencode-session
+                                                         │ 补 x-opencode-session
                                                          │ 路径归一化
+                                                         │ 缺省注入 reasoning_effort=max
                                                          ▼
                                               opencode.ai/inference/go
 ```
@@ -129,15 +130,21 @@ npm run verify     # 编译到 dist/ 并对**编译产物**跑 8 项验证
 ```
 OpenCodeGoProxy/
 ├── api/
-│   └── [...path].ts     Vercel 函数入口，捕获所有路径
+│   ├── health.ts                  健康检查
+│   ├── v1/models.ts               模型列表
+│   ├── v1/chat/completions.ts     Chat Completions
+│   ├── v1/responses.ts            Responses API
+│   └── v1/messages.ts             Anthropic Messages
 ├── lib/
-│   ├── proxy.ts         核心转发逻辑（不依赖 Vercel，可单测）
-│   ├── path.ts          路径归一化
-│   └── session.ts       x-opencode-session 生成
-├── test/                Node 内置 test runner
+│   ├── proxy.ts                   核心转发逻辑（平台无关，可单测）
+│   ├── handler.ts                 路由共用的请求/响应适配
+│   ├── path.ts                    路径归一化
+│   └── session.ts                 x-opencode-session 生成
+├── test/                          Node 内置 test runner，28 项
 ├── scripts/
-│   └── dev-server.ts    本地开发服务器
-└── vercel.json          rewrite + 超时配置
+│   ├── dev-server.ts              本地开发服务器
+│   └── verify.ts                  编译产物验证，9 项
+└── vercel.json                    rewrite + 函数配置
 ```
 
 `lib/` 不 import 任何 Vercel API，所以测试可以脱离平台直接跑，也能移植到其他平台（Cloudflare Workers、Deno Deploy、Netlify）。

@@ -65,15 +65,20 @@ export interface ProxyConfig {
   plan?: Plan;
   upstream?: string;
   sessionMode?: SessionMode;
+  /** 未指定推理强度时注入的默认值；传 `false` 关闭注入 */
+  defaultReasoningEffort?: string | false;
   log?: (message: string) => void;
 }
+
+/** Cursor 等客户端常不传推理强度；默认拉满。 */
+export const DEFAULT_REASONING_EFFORT = 'max';
 
 /**
  * 把一个 OpenAI 兼容请求转发到 OpenCode 网关。
  *
  * 关键设计：**不持有任何凭据**。
  * 调用方（Cursor）自带的 `Authorization: Bearer oc_sk_...` 原样透传给上游，
- * 服务器只在中间补 `x-opencode-session` 并归一化路径。
+ * 服务器只在中间补 `x-opencode-session`、归一化路径，并在缺省时注入推理强度。
  * 好处是密钥不落在第三方服务器上，部署者也无法盗用使用者的额度。
  */
 export async function handleProxy(
@@ -84,6 +89,10 @@ export async function handleProxy(
   const base = (config.upstream ?? (config.plan === 'payg' ? UPSTREAM_PAYG : UPSTREAM_GO))
     .replace(/\/+$/, '');
   const sessionMode = config.sessionMode ?? 'conversation';
+  const defaultEffort =
+    config.defaultReasoningEffort === false
+      ? false
+      : (config.defaultReasoningEffort ?? DEFAULT_REASONING_EFFORT);
 
   // 健康检查：不走上游，顺便告诉调用方当前配置
   if (/^\/?(api\/)?(__health|health)$/.test(request.url.split('?')[0])) {
@@ -96,6 +105,7 @@ export async function handleProxy(
           upstream: base,
           sessionMode,
           keyMode: 'passthrough',
+          defaultReasoningEffort: defaultEffort,
           note: '服务器不保存任何密钥，Authorization 由调用方自带并透传给上游',
         },
         null,
@@ -123,6 +133,10 @@ export async function handleProxy(
 
   const path = rewritePath(request.url);
   const target = base + path;
+  const forwardBody =
+    request.method === 'GET' || request.method === 'HEAD'
+      ? undefined
+      : applyDefaultReasoning(request.body, path, defaultEffort);
 
   log(`${request.method} ${request.url} -> ${path}`);
 
@@ -131,7 +145,7 @@ export async function handleProxy(
     upstream = await fetch(target, {
       method: request.method,
       headers,
-      body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body,
+      body: forwardBody,
       // Node 下需要显式声明，否则流式响应会被缓冲
       duplex: 'half',
     });
@@ -182,4 +196,88 @@ function headerValue(
     }
   }
   return undefined;
+}
+
+/**
+ * 客户端未指定推理强度时注入默认值。
+ * - Chat Completions：`reasoning_effort`
+ * - Responses：`reasoning.effort`
+ * - Anthropic Messages：优先 `output_config.effort`，否则 `reasoning_effort`
+ * 已有任一形式则不覆盖。
+ */
+export function applyDefaultReasoning(
+  body: string | undefined,
+  upstreamPath: string,
+  effort: string | false = DEFAULT_REASONING_EFFORT,
+): string | undefined {
+  if (!body || effort === false) {
+    return body;
+  }
+  // 模型列表等非推理端点不动
+  if (/\/models(?:\?|$)/.test(upstreamPath)) {
+    return body;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return body;
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  if (hasReasoningEffort(obj)) {
+    return body;
+  }
+
+  if (upstreamPath.includes('/responses')) {
+    const existing =
+      obj.reasoning && typeof obj.reasoning === 'object' && !Array.isArray(obj.reasoning)
+        ? { ...(obj.reasoning as Record<string, unknown>) }
+        : {};
+    existing.effort = effort;
+    obj.reasoning = existing;
+  } else if (upstreamPath.includes('/anthropic/')) {
+    const existing =
+      obj.output_config &&
+      typeof obj.output_config === 'object' &&
+      !Array.isArray(obj.output_config)
+        ? { ...(obj.output_config as Record<string, unknown>) }
+        : {};
+    existing.effort = effort;
+    obj.output_config = existing;
+  } else {
+    obj.reasoning_effort = effort;
+  }
+
+  return JSON.stringify(obj);
+}
+
+function hasReasoningEffort(obj: Record<string, unknown>): boolean {
+  if (typeof obj.reasoning_effort === 'string' || typeof obj.reasoningEffort === 'string') {
+    return true;
+  }
+  if (obj.reasoning && typeof obj.reasoning === 'object' && !Array.isArray(obj.reasoning)) {
+    const reasoning = obj.reasoning as Record<string, unknown>;
+    if (typeof reasoning.effort === 'string') {
+      return true;
+    }
+  }
+  if (obj.thinking && typeof obj.thinking === 'object') {
+    return true;
+  }
+  if (
+    obj.output_config &&
+    typeof obj.output_config === 'object' &&
+    !Array.isArray(obj.output_config)
+  ) {
+    const config = obj.output_config as Record<string, unknown>;
+    if (typeof config.effort === 'string') {
+      return true;
+    }
+  }
+  return false;
 }
