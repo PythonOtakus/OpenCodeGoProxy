@@ -1,0 +1,208 @@
+{
+  "name": "opencode-go-proxy",
+  "displayName": "OpenCode Go Proxy",
+  "description": "在编辑器内启动本地中转，让 Cursor / VS Code 的 OpenAI 兼容端点用上 OpenCode Go 订阅。自动补上 x-opencode-session 头并归一化 API 路径。",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "opencode",
+    "openai",
+    "proxy",
+    "cursor",
+    "llm"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "opencodeGo.start",
+        "title": "启动中转",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.stop",
+        "title": "停止中转",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.restart",
+        "title": "重启中转",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.copyBaseUrl",
+        "title": "复制 Base URL",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.copySetup",
+        "title": "复制完整配置（Base URL + 口令）",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.rotateToken",
+        "title": "重置访问口令",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.setApiKey",
+        "title": "设置 OpenCode API Key",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.diagnose",
+        "title": "诊断配置",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.test",
+        "title": "自检连接",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.showLog",
+        "title": "查看日志",
+        "category": "OpenCode Go"
+      },
+      {
+        "command": "opencodeGo.menu",
+        "title": "操作菜单",
+        "category": "OpenCode Go"
+      }
+    ],
+    "configuration": {
+      "title": "OpenCode Go 中转",
+      "properties": {
+        "opencodeGo.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "编辑器启动后自动开启中转。"
+        },
+        "opencodeGo.port": {
+          "type": "number",
+          "default": 8787,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "本地监听端口。修改后自动重启。"
+        },
+        "opencodeGo.host": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "监听地址，默认仅本机。"
+        },
+        "opencodeGo.plan": {
+          "type": "string",
+          "enum": [
+            "go",
+            "payg"
+          ],
+          "enumDescriptions": [
+            "Go / Go Plus / Go Teams 订阅端点",
+            "按量付费端点"
+          ],
+          "default": "go",
+          "description": "上游计费端点。"
+        },
+        "opencodeGo.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "可选。填了则由扩展代为设置 `Authorization`，你在 Cursor 的 API Key 框里可以随便填。留空则透传 Cursor 传来的 key。注意扩展设置是明文存储，公共机器上不要填。"
+        },
+        "opencodeGo.sessionMode": {
+          "type": "string",
+          "enum": [
+            "conversation",
+            "fixed",
+            "random"
+          ],
+          "enumDescriptions": [
+            "按首条用户消息生成，同一段对话稳定复用，prompt cache 命中率最好（推荐）",
+            "所有请求共用一个固定 session",
+            "每个请求随机，仅用于排查问题"
+          ],
+          "default": "conversation",
+          "description": "`x-opencode-session` 的生成方式。"
+        },
+        "opencodeGo.modelMap": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "模型名映射。左边填你在编辑器里选的模型名，右边填上游模型 ID，例如 `{\"gpt-4o\": \"kimi-k3\"}`。可用 ID 见 https://opencode.ai/console/go#models"
+        },
+        "opencodeGo.tunnel": {
+          "type": "boolean",
+          "default": false,
+          "deprecated": true,
+          "markdownDescription": "已弃用，改用 `opencodeGo.tunnelMode`。"
+        },
+        "opencodeGo.tunnelMode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "quick",
+            "named",
+            "external"
+          ],
+          "enumDescriptions": [
+            "不启用隧道。只有从本机发请求的客户端（Cline / Roo / Kilo 等）能连",
+            "Cloudflare Quick Tunnel：零配置，但每次启动域名都变，Cursor 里要重新填",
+            "Cloudflare 命名隧道：域名固定，长期使用选这个（推荐）",
+            "你自己已跑好隧道（ngrok / Tailscale Funnel / 自建），扩展只管本地中转"
+          ],
+          "default": "none",
+          "markdownDescription": "隧道模式。\n\n**Cursor 必须开隧道**：Cursor 的 `Override OpenAI Base URL` 由 Cursor 服务器代发请求，SSRF 防护按设计拒绝 `127.0.0.1`，报 `Access to private networks is forbidden`。\n\n要域名固定，用 `named`（见 `tunnelToken` / `tunnelHostname`）。"
+        },
+        "opencodeGo.tunnelToken": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "`named` 模式的隧道令牌。Cloudflare Zero Trust → Networks → Tunnels → 创建隧道 → 选择 cloudflared → 复制 `--token` 后面的那串。**这是一份凭据，泄漏后可在 Cloudflare 侧轮换。**"
+        },
+        "opencodeGo.tunnelHostname": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "`named` / `external` 模式的公网地址，如 `https://go.example.com`。需要在 Cloudflare 隧道里配置 Public Hostname 指向 `http://localhost:8787`。填这里之后 Base URL 就是固定值，不再变化。"
+        },
+        "opencodeGo.tunnelBinary": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "cloudflared 可执行文件路径。留空则自动探测（含 `C:\\Program Files (x86)\\cloudflared\\`）。安装：`winget install Cloudflare.cloudflared`"
+        },
+        "opencodeGo.requireToken": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "要求调用方带访问口令（`Authorization: Bearer <token>`）。隧道暴露到公网时**必须保持开启**，否则任何人拿到 URL 就能消耗你的 Go 额度。口令由扩展自动生成并存在编辑器密钥库中，`复制完整配置` 会一并给出。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run compile",
+    "test": "node --test \"out/test/suite/**/*.test.js\"",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.2.1",
+    "typescript": "^5.7.2"
+  },
+  "extensionKind": [
+    "workspace"
+  ]
+}

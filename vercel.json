@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/v1/(.*)", "destination": "/api/v1/$1" },
+    { "source": "/v1", "destination": "/api/v1" },
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/__health", "destination": "/api/health" }
+  ],
+  "functions": {
+    "api/[...path].ts": {
+      "maxDuration": 300
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [{ "key": "X-Powered-By", "value": "OpenCodeGoProxy" }]
+    }
+  ]
+}
